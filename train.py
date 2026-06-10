@@ -1,5 +1,5 @@
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.gym import PathPlanningGymFactory
 from src.trainer.agent import AgentFactory
@@ -11,11 +11,11 @@ from utils import AbstractParams
 
 @dataclass
 class PathPlanningParams(AbstractParams):
-    trainer: TrainerFactory.default_param_type() = TrainerFactory.default_params()
-    gym: PathPlanningGymFactory.default_param_type() = PathPlanningGymFactory.default_params()
-    logger: Logger.Params = Logger.Params()
-    evaluator: Evaluator.Params = Evaluator.Params()
-    agent: AgentFactory.default_param_type() = AgentFactory.default_params()
+    trainer: TrainerFactory.default_param_type() = field(default_factory=TrainerFactory.default_params)
+    gym: PathPlanningGymFactory.default_param_type() = field(default_factory = PathPlanningGymFactory.default_params)
+    logger: Logger.Params = field(default_factory = Logger.Params)
+    evaluator: Evaluator.Params = field(default_factory = Evaluator.Params)
+    agent: AgentFactory.default_param_type() = field(default_factory = AgentFactory.default_params)
 
 
 if __name__ == "__main__":

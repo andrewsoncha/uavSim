@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
 
 from gymnasium import spaces
@@ -45,12 +45,19 @@ class DiscountSuccessSchedule:
     def __call__(self, step):
         return 1.0 - self.decay(self.successes)
 
+# This method is made by Andrew to pass as an argument-less function
+# to be used as default factory method. This is to use the field 
+# instead of passing a mutable object as a default value for dataclass
+# Andrew Chang - June 10th, 2026.
+
+def decayMethod():
+    return DecayParams(0.96, 0.5, 1_000_000)
 
 class BaseTrainer:
     @dataclass
     class Params:
         training_steps: int = 2_000_000
-        gamma: DecayParams = DecayParams(0.96, 0.5, 1_000_000)
+        gamma: DecayParams = field(default_factory = decayMethod)
 
     def __init__(self, gym: GridGym):
         self.gym = gym

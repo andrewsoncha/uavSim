@@ -1,6 +1,6 @@
 import numpy as np
 import pygame
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from skimage.draw import random_shapes
 from src.gym.grid import GridGym, GridRewardParams, GridRenderParams, GridStateRenderParams
@@ -102,18 +102,18 @@ class CPPStateRenderParams(GridStateRenderParams):
 
 @dataclass
 class CPPRenderParams(GridRenderParams):
-    normal_state: CPPStateRenderParams = CPPStateRenderParams()
-    terminal_state: CPPStateRenderParams = CPPStateRenderParams()
+    normal_state: CPPStateRenderParams = field(default_factory = CPPStateRenderParams)
+    terminal_state: CPPStateRenderParams = field(default_factory = CPPStateRenderParams)
 
 
 class CPPGym(GridGym):
     @dataclass
     class Params(GridGym.Params):
-        target_generator: RandomTargetGenerator.Params = RandomTargetGenerator.Params()
+        target_generator: RandomTargetGenerator.Params = field(default_factory = RandomTargetGenerator.Params)
         camera_half_length: int = 2
 
-        rewards: CPPRewardParams = CPPRewardParams()
-        rendering: CPPRenderParams = CPPRenderParams()
+        rewards: CPPRewardParams = field(default_factory = CPPRewardParams)
+        rendering: CPPRenderParams = field(default_factory = CPPRenderParams)
 
     @dataclass
     class Init(GridGym.Init):

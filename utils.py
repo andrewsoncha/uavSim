@@ -102,6 +102,7 @@ class AbstractParams(DataClassJsonMixin):
     def read_from(cls, config_path):
         with open(config_path, 'r') as f:
             js = json.load(f)
+            print('cls: ', cls)
             params = cls.from_dict(js)
             return params
 

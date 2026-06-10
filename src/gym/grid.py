@@ -1,5 +1,5 @@
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Union, List, Callable, Tuple
 
 import gymnasium as gym
@@ -26,8 +26,8 @@ class GridRenderParams:
     env_pixels: int = 768
     addons: bool = True
 
-    normal_state: GridStateRenderParams = GridStateRenderParams()
-    terminal_state: GridStateRenderParams = GridStateRenderParams()
+    normal_state: GridStateRenderParams = field(default_factory = GridStateRenderParams)
+    terminal_state: GridStateRenderParams = field(default_factory = GridStateRenderParams)
 
 
 @dataclass
@@ -52,9 +52,9 @@ class GridGym(gym.Env):
         recharge: bool = True
         charge_amount: float = 2.0
 
-        rewards: GridRewardParams = GridRewardParams()
+        rewards: GridRewardParams = field(default_factory = GridRewardParams)
 
-        rendering: GridRenderParams = GridRenderParams()
+        rendering: GridRenderParams = field(default_factory = GridRenderParams)
 
         action_masking: str = "invariant"  # ["none", "invalid", "immediate", "invariant"]
 
@@ -62,7 +62,7 @@ class GridGym(gym.Env):
         position_history_alpha: float = 0.99
 
         # Observation function
-        obs_function: ObservationFunctionFactory.default_param_type() = ObservationFunctionFactory.default_params()
+        obs_function: ObservationFunctionFactory.default_param_type() = field(default_factory = ObservationFunctionFactory.default_params)
 
     @dataclass
     class Init:

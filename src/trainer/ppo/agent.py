@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.trainer.agent import Agent
 from src.trainer.model import ModelFactory
@@ -9,7 +9,7 @@ import tensorflow as tf
 class ACAgent(Agent):
     @dataclass
     class Params(Agent.Params):
-        model: ModelFactory.default_param_type() = ModelFactory.default_params()
+        model: ModelFactory.default_param_type() = field(default_factory = ModelFactory.default_params)
 
     def __init__(self, params, obs_space, act_space):
         super().__init__(params)

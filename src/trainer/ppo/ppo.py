@@ -1,5 +1,5 @@
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
@@ -30,8 +30,8 @@ class PPOTrainer(BaseTrainer):
         batch_size: int = 128
         rollout_epochs: int = 4
 
-        actor_lr: DecayParams = DecayParams()
-        critic_lr: DecayParams = DecayParams()
+        actor_lr: DecayParams = field(default_factory = DecayParams)
+        critic_lr: DecayParams = field(default_factory = DecayParams)
         use_success_discount: bool = False
 
         debug_observations: bool = False
