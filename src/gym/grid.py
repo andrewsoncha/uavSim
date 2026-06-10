@@ -97,7 +97,7 @@ class GridGym(gym.Env):
 
     def __init__(self, params: Params):
         pygame.init()
-        pygame.font.init()
+        # pygame.font.init()
         self.params = params
 
         self.shape = np.zeros((2,))
