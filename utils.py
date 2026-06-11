@@ -264,7 +264,7 @@ def find_scenario(scenario, exit_on_not_found=True):
 
 
 def find_config_model(model, exit_on_not_found=True):
-    files = [f"{model}/config.json", f"logs/{model}/config.json", f"example/models/{model}/config.json"]
+    files = [f"{model}/config.json", f"logs/{model}/config.json", f"./example/models/{model}/config.json"]
     return find_file(model, files, exit_on_not_found)
 
 

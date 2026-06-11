@@ -4,7 +4,9 @@ from src.trainer.agent import Agent
 from src.trainer.model import ModelFactory
 
 import tensorflow as tf
+import keras
 
+import os
 
 class ACAgent(Agent):
     @dataclass
@@ -22,26 +24,31 @@ class ACAgent(Agent):
         self.expert_inference = False
 
     def save_network(self, path, name="model"):
-        self.actor.model.save(f"{path}/actor_{name}")
-        self.critic.model.save(f"{path}/critic_{name}")
+        print('Agent path: ', f"{path}/actor_{name}.keras")
+        print('Critic path: ', f"{path}/critic_{name}")
+        self.actor.model.save(f"{path}/actor_{name}.keras")
+        self.critic.model.save(f"{path}/critic_{name}.keras")
 
     def load_network(self, path, name="model"):
-        self.actor.model = tf.keras.models.load_model(f"{path}/actor_{name}")
-        self.critic.model = tf.keras.models.load_model(f"{path}/critic_{name}")
+        self.actor.model = keras.models.load_model(f"{path}/actor_{name}.keras")
+        self.critic.model = keras.models.load_model(f"{path}/critic_{name}.keras")
 
     def load_weights(self, path, name="latest"):
-        self.actor.model.load_weights(f"{path}/actor_{name}")
-        self.critic.model.load_weights(f"{path}/critic_{name}")
+        self.actor.model.load_weights(f"{path}/actor_{name}.weights.h5")
+        self.critic.model.load_weights(f"{path}/critic_{name}.weights.h5")
 
     def save_weights(self, path, name="latest"):
-        self.actor.model.save_weights(f"{path}/actor_{name}")
-        self.critic.model.save_weights(f"{path}/critic_{name}")
+        self.actor.model.save_weights(f"{path}/actor_{name}.weights.h5")
+        self.critic.model.save_weights(f"{path}/critic_{name}.weights.h5")
 
     def save_keras(self, path):
         self.actor.model.save(f"{path}/actor.keras")
         self.critic.model.save(f"{path}/critic.keras")
 
     def load_keras(self, path):
+        print('Current Working Directory: ', os.getcwd())
+        print('Finding for file in path: ', f"{path}/actor.keras")
+        print('Is there a file in this path? ', os.path.isfile(f"{path}/actor.keras"))
         self.actor.model = tf.keras.models.load_model(f"{path}/actor.keras")
         self.critic.model = tf.keras.models.load_model(f"{path}/critic.keras")
 
