@@ -13,6 +13,9 @@ class ACAgent(Agent):
 
     def __init__(self, params, obs_space, act_space):
         super().__init__(params)
+        print('params: ', params)
+        print('obs_space: ', obs_space)
+        print('act_space: ', act_space)
         self.actor = ModelFactory.create(params.model, obs_space=obs_space, act_space=act_space)
         self.critic = ModelFactory.create(params.model, obs_space=obs_space, act_space=None)
 

@@ -2,7 +2,9 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.keras.layers import Input, Conv2D, Dense, MaxPool2D, Flatten, Embedding
+from tensorflow.keras import ops
+
+from tensorflow.keras.layers import Input, Conv2D, Dense, MaxPool2D, Flatten, Embedding, Concatenate
 from tensorflow.keras import Model
 
 from utils import Factory
@@ -204,11 +206,14 @@ class RotEquivarianceModel(MapModel):
         if self.params.conversion == "flatten":
             features = Flatten()(plain_map)
         elif self.params.conversion == "reduce":
-            features = tf.reduce_max(tf.reduce_max(plain_map, axis=1), axis=1)
+            # Replaced to use keras.ops.max so kerasTensor doesn't raise an error
+            # -- Andrew Chang, June 10th, 2026
+            # features = tf.reduce_max(tf.reduce_max(plain_map, axis=1), axis=1)
+            features = ops.max(ops.max(plain_map, axis=1), axis=1)
         else:
             raise NotImplementedError(f"Unknown conversion: {self.params.conversion}")
 
-        layer = tf.concat((features, scalars_input), axis=1)
+        layer = Concatenate(axis=1)([features, scalars_input])
 
         hidden_layer_num = self.params.hidden_layer_num
         for k in range(hidden_layer_num):
@@ -225,7 +230,8 @@ class RotEquivarianceModel(MapModel):
             # Value head
             outputs = Dense(1, activation=None)(layer)
         else:
-            outputs = Dense(self.action_space.n, activation=None)(layer)
+            print('self.action_space.n: ', self.action_space.n)
+            outputs = Dense(units = int(self.action_space.n), activation=None)(layer)
         return outputs
 
     @tf.function(jit_compile=True)
