@@ -17,7 +17,6 @@ class NNModel:
         self.observation_space = obs_space
         self.action_space = act_space
         self.model = self.create_model()
-        print('model summary: ', self.model.summary())
 
     @tf.function
     def __call__(self, obs):
@@ -94,7 +93,6 @@ class MapModel(NNModel):
 
         hidden_layer_num = self.params.hidden_layer_num
         for k in range(hidden_layer_num):
-            print('hidden_layer_size: ', hidden_layer_size)
             layer = Dense(hidden_layer_size, activation="relu")(layer)
 
         outputs = self.add_head(layer, mask_input)
@@ -232,7 +230,6 @@ class RotEquivarianceModel(MapModel):
             # Value head
             outputs = Dense(1, activation=None)(layer)
         else:
-            print('self.action_space.n: ', self.action_space.n)
             outputs = Dense(units = int(self.action_space.n), activation=None)(layer)
         return outputs
 
@@ -243,7 +240,6 @@ class RotEquivarianceModel(MapModel):
             return self.model(obs)
         # Actor, apply mask
         mask = obs["mask"]
-        print('obs: ', obs)
         outputs = self.model(obs)
         masked = tf.where(mask, outputs, -np.inf)
         return tf.math.softmax(masked, axis=-1)
