@@ -178,6 +178,7 @@ class GlobLocObservation(CenteredMapObservation):
         global_map = skimage.measure.block_reduce(centered, (1, g, g, 1), np.mean)
         x, y = centered.shape[1:3]
         local_map = centered[:, x // 2 - l // 2: x // 2 + l // 2 + 1, x // 2 - l // 2: x // 2 + l // 2 + 1, :]
+        print('global_map shape: ', global_map.shape)
         obs.update({"global_map": global_map, "local_map": local_map})
 
         return obs
