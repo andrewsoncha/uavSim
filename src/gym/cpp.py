@@ -152,7 +152,9 @@ class CPPGym(GridGym):
     def initialize_map(self, state, map_index=None):
         self._initialize_map(state, map_index)
         target = np.zeros(state.map.shape[:2] + (1,), dtype=bool)
+        print('target shape:', target.shape)
         state.map = np.concatenate((state.map, target), axis=-1)
+        print('state.map shape:', state.map.shape)
         state.coverage = np.zeros(state.map.shape[:2], dtype=bool)
 
     def add_map(self, filename):

@@ -4,7 +4,7 @@ import tensorflow as tf
 
 from tensorflow.keras import ops
 
-from tensorflow.keras.layers import Input, Conv2D, Dense, MaxPool2D, Flatten, Embedding, Concatenate
+from tensorflow.keras.layers import Input, Conv2D, Dense, MaxPool2D, Flatten, Embedding, Concatenate, Softmax
 from tensorflow.keras import Model
 
 from utils import Factory
@@ -27,9 +27,9 @@ class NNModel:
             # Value head
             outputs = Dense(1, activation=None)(layer)
         else:
-            layer = Dense(self.action_space.n, activation=None)(layer)
-            layer = tf.where(mask, layer, -np.inf)
-            outputs = tf.math.softmax(layer, axis=-1)
+            layer = Dense(int(self.action_space.n), activation=None)(layer)
+            layer = ops.where(mask, layer, -np.inf)
+            outputs = Softmax(axis=-1)(layer)
         return outputs
 
     @property
@@ -153,12 +153,12 @@ class GlobLocModel(NNModel):
             global_features = Flatten()(global_map)
             local_features = Flatten()(local_map)
         elif self.params.conversion == "reduce":
-            global_features = tf.reduce_max(tf.reduce_max(global_map, axis=1), axis=1)
-            local_features = tf.reduce_max(tf.reduce_max(local_map, axis=1), axis=1)
+            global_features = ops.max(ops.max(global_map, axis=1), axis=1)
+            local_features = ops.max(ops.max(local_map, axis=1), axis=1)
         else:
             raise NotImplementedError(f"Unknown conversion: {self.params.conversion}")
 
-        layer = tf.concat((local_features, global_features, scalars_input), axis=1)
+        layer = Concatenate(axis=1)([local_features, global_features, scalars_input])
 
         hidden_layer_num = self.params.hidden_layer_num
         for k in range(hidden_layer_num):
@@ -290,7 +290,7 @@ class RotEquivarianceModel(MapModel):
         actions270 = tf.roll(actions270, -3, axis=-1)
 
         dir_actions_corrected = tf.stack((actions0, actions90, actions180, actions270), axis=1)
-        actions_corrected = tf.concat((dir_actions_corrected, non_dir_actions), axis=2)  # [b, 4, 7]
+        actions_corrected = Concatenate(axis=2)([dir_actions_corrected, non_dir_actions])  # [b, 4, 7]
 
         actions_masked = tf.where(mask[:, None, :], actions_corrected, -np.inf)
         soft = tf.math.softmax(actions_masked, axis=2)

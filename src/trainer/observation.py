@@ -42,6 +42,7 @@ class PlainMapObservation(ObservationFunction):
         self.padded_map = None
 
     def observe(self, state):
+        print('Plain observation function called!')
         map_layers = state.map
         position_layer = np.zeros_like(state.map[..., 0])
         position_layer[state.position[0], state.position[1]] = 1
@@ -92,23 +93,31 @@ class CenteredMapObservation(ObservationFunction):
 
         x, y = np.array(map_layers.shape[:2]) - position - 1
         m = map_layers.shape[0]
+        print('m: ', m)
 
         if self.centered_map is None:
             m_c = m * 2 - 1
+            print('m_c: ', m_c)
+            print('np.reshape(self.params.padding_values, (1, 1, -1)), repeats=m_c, axis=0): ', np.reshape(self.params.padding_values, (1, 1, -1)).shape)
+
             self.centered_map = np.repeat(
                 np.repeat(np.reshape(self.params.padding_values, (1, 1, -1)), repeats=m_c, axis=0), repeats=m_c,
                 axis=1).astype(float)
 
         centered_map = self.centered_map.copy()
+        print('centered_map: ', centered_map.shape)
+        print('map_layers: ', map_layers.shape)
         centered_map[x:x + m, y:y + m] = map_layers
 
         return centered_map
 
     def observe(self, state):
         map_layers = state.map
+        print('map_layers.shape: ', map_layers.shape)
         if self.params.position_history:
             map_layers = np.concatenate((map_layers, np.expand_dims(state.position_history, -1)), axis=-1)
 
+        print('state.position.shape: ', state.position.shape)
         centered_map = np.expand_dims(self.pad_centered(map_layers, state.position), axis=0)
         scalars = np.expand_dims(
             np.stack((state.budget / self.max_budget, state.landed), axis=-1), axis=0)
@@ -152,13 +161,18 @@ class GlobLocObservation(CenteredMapObservation):
         self.params = params
 
     def observe(self, state):
+        print('state: ', state)
         obs = super().observe(state)
         obs = self._observe(obs)
 
         return obs
 
     def _observe(self, obs):
+        print('_observe called!')
         centered = obs.pop("map")
+        # Put here for experimenting
+        # print('centered: ', centered)
+        # end of experiment code
         g = self.params.global_map_scaling
         l = self.params.local_map_size
         global_map = skimage.measure.block_reduce(centered, (1, g, g, 1), np.mean)
