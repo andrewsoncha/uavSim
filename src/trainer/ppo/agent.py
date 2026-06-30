@@ -5,6 +5,7 @@ from src.trainer.model import ModelFactory
 
 import tensorflow as tf
 import keras
+import numpy as np
 
 import os
 
@@ -30,10 +31,12 @@ class ACAgent(Agent):
         self.critic.model.save(f"{path}/critic_{name}.keras")
 
     def load_network(self, path, name="model"):
+        print('load_network path: ', path)
         self.actor.model = keras.models.load_model(f"{path}/actor_{name}.keras")
         self.critic.model = keras.models.load_model(f"{path}/critic_{name}.keras")
 
     def load_weights(self, path, name="latest"):
+        print('load_network path: ', path)
         self.actor.model.load_weights(f"{path}/actor_{name}.weights.h5")
         self.critic.model.load_weights(f"{path}/critic_{name}.weights.h5")
 
@@ -52,10 +55,17 @@ class ACAgent(Agent):
         self.actor.model = tf.keras.models.load_model(f"{path}/actor.keras")
         self.critic.model = tf.keras.models.load_model(f"{path}/critic.keras")
 
-    @tf.function
+    # @tf.function
     def actor_inference(self, obs):
-        print('self.expert_inference: ', self.expert_inference)
-        return self.actor.predict_expert(obs) if self.expert_inference else self.actor(obs)
+        # print("mask in actor_inference:", obs.get("mask"))
+        # print("obs keys:", obs.keys())
+        if self.expert_inference:
+            return self.actor.predict_expert(obs)
+        else:
+            mask = obs["mask"]
+            logits = self.actor(obs)
+            masked = tf.where(mask, logits, tf.fill(tf.shape(logits), -np.inf))
+            return tf.nn.softmax(masked, axis=-1)
 
     @tf.function
     def critic_inference(self, obs):
@@ -68,9 +78,10 @@ class ACAgent(Agent):
 
         return probs, value
 
-    @tf.function
+    # @tf.function(reduce_retracing=True)
     def get_action_prob_and_value(self, obs):
-        print('This is in ppo/agent.py get_action_prob_and_value!')
+        # print('This is in ppo/agent.py get_action_prob_and_value!')
+        # print("mask at entry:", obs.get("mask"))
         action, probs = self.get_exploration_action(obs)
         value = self.get_value(obs)
         return action, probs, value
@@ -80,16 +91,16 @@ class ACAgent(Agent):
         value = self.critic_inference(obs)
         return tf.squeeze(value, axis=-1)
 
-    @tf.function
+    # @tf.function
     def get_exploration_action(self, obs, step=None):
-        print('This is in ppo/agent.py get_exploration_action')
+        # print('This is in ppo/agent.py get_exploration_action')
         probs = self.actor_inference(obs)
         actions = tf.random.categorical(tf.math.log(probs), 1)
         p = tf.gather_nd(probs, actions, batch_dims=1)
         actions = tf.squeeze(actions, axis=-1)
         return actions, p
 
-    @tf.function
+    # @tf.function
     def get_exploitation_action(self, obs):
         probs = self.actor_inference(obs)
         action = tf.argmax(probs, axis=-1)
