@@ -7,6 +7,7 @@ from gymnasium import spaces
 from utils import Factory
 
 import skimage.measure
+import random
 
 
 class ObservationFunction:
@@ -149,6 +150,26 @@ class CenteredMapObservation(ObservationFunction):
             }
         )
 
+# Written by Andrew Chang
+# Every cell in the map has a 'flip_prob' probability of flipping
+# (0 -> 1, 1 -> 0) 
+# This method only works when the map is binary (0 or 1)
+# If it's a range of real number this might need to change
+# Andrew Chang - June 29th, 2026
+def flipMutate(global_map_arr, flip_prob: float):
+    map_arr = global_map_arr.copy()
+    map_shape = map_arr.shape
+    assert len(map_shape) == 4
+    for i in range(map_shape[0]):
+        for j in range(map_shape[1]):
+            for k in range(map_shape[2]):
+                c = map_arr[i, j, k, 3] # the 3rd value of the cell array is whether or
+                                        # not the cell is a target zone
+                # Flip c with the probability of flip_prob
+                if random.random() < flip_prob:
+                    c = 1.0 - c
+                map_arr[i, j, k, 3] = c
+    return map_arr 
 
 class GlobLocObservation(CenteredMapObservation):
     @dataclass
@@ -163,20 +184,33 @@ class GlobLocObservation(CenteredMapObservation):
     def observe(self, state):
         # print('state: ', state)
         obs = super().observe(state)
+        # print('obs: ', obs)
+        # print('obs[map]: ', obs['map'])
+        # print('obs[map].shape: ', obs['map'].shape)
+        # print('obs[map] first dim: ', obs['map'].shape[0])
         obs = self._observe(obs)
-        # print('obs[scalars] shape: ', obs['scalars'].shape)
 
         return obs
 
     def _observe(self, obs):
         # print('_observe called!')
         centered = obs.pop("map")
+        # print('centered.shape: ', centered.shape)
         # Put here for experimenting
         # print('centered: ', centered)
         # end of experiment code
         g = self.params.global_map_scaling
         l = self.params.local_map_size
         global_map = skimage.measure.block_reduce(centered, (1, g, g, 1), np.mean)
+        
+        # Add Probability flip
+        mutated_global_map = flipMutate(global_map, 0.05)
+
+        diff = mutated_global_map - global_map
+
+        # print("Changed Cells count: ", np.count_nonzero(diff))
+
+        # print('global_map shape: ', global_map.shape)
         x, y = centered.shape[1:3]
         local_map = centered[:, x // 2 - l // 2: x // 2 + l // 2 + 1, x // 2 - l // 2: x // 2 + l // 2 + 1, :]
         # print('global_map shape: ', global_map.shape)
@@ -200,7 +234,6 @@ class GlobLocObservation(CenteredMapObservation):
                 "mask": spaces.Box(low=0, high=1, shape=obs["mask"].shape, dtype=bool)
             }
         )
-
 
 class ObservationFunctionFactory(Factory):
     @classmethod
