@@ -43,7 +43,7 @@ class PlainMapObservation(ObservationFunction):
         self.padded_map = None
 
     def observe(self, state):
-        print('Plain observation function called!')
+        # print('Plain observation function called!')
         map_layers = state.map
         position_layer = np.zeros_like(state.map[..., 0])
         position_layer[state.position[0], state.position[1]] = 1
@@ -94,31 +94,31 @@ class CenteredMapObservation(ObservationFunction):
 
         x, y = np.array(map_layers.shape[:2]) - position - 1
         m = map_layers.shape[0]
-        print('m: ', m)
+        # print('m: ', m)
 
         if self.centered_map is None:
             m_c = m * 2 - 1
-            print('m_c: ', m_c)
-            print('np.reshape(self.params.padding_values, (1, 1, -1)), repeats=m_c, axis=0): ', np.reshape(self.params.padding_values, (1, 1, -1)).shape)
+            # print('m_c: ', m_c)
+            # print('np.reshape(self.params.padding_values, (1, 1, -1)), repeats=m_c, axis=0): ', np.reshape(self.params.padding_values, (1, 1, -1)).shape)
 
             self.centered_map = np.repeat(
                 np.repeat(np.reshape(self.params.padding_values, (1, 1, -1)), repeats=m_c, axis=0), repeats=m_c,
                 axis=1).astype(float)
 
         centered_map = self.centered_map.copy()
-        print('centered_map: ', centered_map.shape)
-        print('map_layers: ', map_layers.shape)
+        # print('centered_map: ', centered_map.shape)
+        # print('map_layers: ', map_layers.shape)
         centered_map[x:x + m, y:y + m] = map_layers
 
         return centered_map
 
     def observe(self, state):
         map_layers = state.map
-        print('map_layers.shape: ', map_layers.shape)
+        # print('map_layers.shape: ', map_layers.shape)
         if self.params.position_history:
             map_layers = np.concatenate((map_layers, np.expand_dims(state.position_history, -1)), axis=-1)
 
-        print('state.position.shape: ', state.position.shape)
+        # print('state.position.shape: ', state.position.shape)
         centered_map = np.expand_dims(self.pad_centered(map_layers, state.position), axis=0)
         scalars = np.expand_dims(
             np.stack((state.budget / self.max_budget, state.landed), axis=-1), axis=0)
@@ -182,20 +182,20 @@ class GlobLocObservation(CenteredMapObservation):
         self.params = params
 
     def observe(self, state):
-        print('state: ', state)
+        # print('state: ', state)
         obs = super().observe(state)
-        print('obs: ', obs)
-        print('obs[map]: ', obs['map'])
-        print('obs[map].shape: ', obs['map'].shape)
-        print('obs[map] first dim: ', obs['map'].shape[0])
+        # print('obs: ', obs)
+        # print('obs[map]: ', obs['map'])
+        # print('obs[map].shape: ', obs['map'].shape)
+        # print('obs[map] first dim: ', obs['map'].shape[0])
         obs = self._observe(obs)
 
         return obs
 
     def _observe(self, obs):
-        print('_observe called!')
+        # print('_observe called!')
         centered = obs.pop("map")
-        print('centered.shape: ', centered.shape)
+        # print('centered.shape: ', centered.shape)
         # Put here for experimenting
         # print('centered: ', centered)
         # end of experiment code
@@ -208,12 +208,12 @@ class GlobLocObservation(CenteredMapObservation):
 
         diff = mutated_global_map - global_map
 
-        print("Changed Cells count: ", np.count_nonzero(diff))
+        # print("Changed Cells count: ", np.count_nonzero(diff))
 
-        print('global_map shape: ', global_map.shape)
+        # print('global_map shape: ', global_map.shape)
         x, y = centered.shape[1:3]
         local_map = centered[:, x // 2 - l // 2: x // 2 + l // 2 + 1, x // 2 - l // 2: x // 2 + l // 2 + 1, :]
-        print('global_map shape: ', global_map.shape)
+        # print('global_map shape: ', global_map.shape)
         obs.update({"global_map": global_map, "local_map": local_map})
 
         return obs
