@@ -163,12 +163,12 @@ def flipMutate(global_map_arr, flip_prob: float):
     for i in range(map_shape[0]):
         for j in range(map_shape[1]):
             for k in range(map_shape[2]):
-                for l in range(map_shape[3]):
-                    c = map_arr[i, j, k, l]
-                    # Flip c with the probability of flip_prob
-                    if random.random() < flip_prob:
-                        c = 1.0 - c
-                    map_arr[i, j, k, l] = c
+                c = map_arr[i, j, k, 3] # the 3rd value of the cell array is whether or
+                                        # not the cell is a target zone
+                # Flip c with the probability of flip_prob
+                if random.random() < flip_prob:
+                    c = 1.0 - c
+                map_arr[i, j, k, 3] = c
     return map_arr 
 
 class GlobLocObservation(CenteredMapObservation):
