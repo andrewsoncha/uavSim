@@ -6,7 +6,6 @@ from tensorflow.keras import ops
 
 from tensorflow.keras.layers import Input, Conv2D, Dense, MaxPool2D, Flatten, Embedding, Concatenate, Softmax
 from tensorflow.keras import Model
-from tensorflow.keras.utils import plot_model
 
 from utils import Factory
 
@@ -18,7 +17,6 @@ class NNModel:
         self.observation_space = obs_space
         self.action_space = act_space
         self.model = self.create_model()
-        plot_model(self.model, to_file='model.png')
 
     @tf.function
     def __call__(self, obs):
