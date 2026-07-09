@@ -7,6 +7,8 @@ from src.gym.grid import GridGym, GridRewardParams, GridRenderParams, GridStateR
 from src.gym.utils import get_visibility_map, draw_text, draw_shape_matrix, is_solvable
 from seaborn import color_palette
 
+import cv2
+
 
 class RandomTargetGenerator:
     @dataclass
@@ -29,18 +31,33 @@ class RandomTargetGenerator:
             obstacles.shape
         )
 
-        return target & ~obstacles
+        # return (target>0) & ~obstacles
+        return np.where(~obstacles, target, 0.0)
 
     def __generate_random_shapes(self, min_shapes, max_shapes, shape):
         img, _ = random_shapes(shape, max_shapes, min_shapes=min_shapes, channel_axis=None,
                                allow_overlap=True, rng=np.random.randint(2 ** 32 - 1))
         # Numpy random usage for random seed unifies random seed which can be set for repeatability
-        attempt = np.array(img != 255, dtype=bool)
-        return attempt, np.sum(attempt)
+        print('img: ', img.shape)
+        _, nonZeros = cv2.threshold(img, 254, 255, cv2.THRESH_BINARY_INV)
+        print('nonZeros shape:', nonZeros.shape)
+        cv2.imshow('nonZeros', nonZeros)
+        cv2.imshow('random shapes', img)
+        distTransform = cv2.distanceTransform(nonZeros, cv2.DIST_C, 5)
+        distMin, distMax = np.min(distTransform), np.max(distTransform)
+        if distMax - distMin == 0:
+            distNormalized = distTransform
+        else:
+            distNormalized = (distTransform - distMin) / (distMax - distMin)
+        print('distNormalized max: ', np.max(distNormalized))
+        cv2.imshow('distTransForm', distNormalized*255)
+        cv2.waitKey(5)
+        return distNormalized, np.count_nonzero(distNormalized)
 
     def __generate_random_shapes_area(self, min_shapes, max_shapes, min_area, max_area, shape, retry=100):
         for attemptno in range(retry):
             attempt, area = self.__generate_random_shapes(min_shapes, max_shapes, shape)
+            print('attempt: ', attempt.dtype)
             if min_area is not None and min_area > area:
                 continue
             if max_area is not None and max_area < area:
@@ -151,9 +168,9 @@ class CPPGym(GridGym):
 
     def initialize_map(self, state, map_index=None):
         self._initialize_map(state, map_index)
-        target = np.zeros(state.map.shape[:2] + (1,), dtype=bool)
+        target = np.zeros(state.map.shape[:2] + (1,), dtype=float)
         print('target shape:', target.shape)
-        state.map = np.concatenate((state.map, target), axis=-1)
+        state.map = np.concatenate((state.map.astype(float), target), axis=-1)
         print('state.map shape:', state.map.shape)
         state.coverage = np.zeros(state.map.shape[:2], dtype=bool)
 
@@ -175,10 +192,15 @@ class CPPGym(GridGym):
 
         if init is None:
             init = self.generate_init(map_name)
+            print('init: ', init)
         state.init = init
         self.initialize_map(state, self.get_map_index(init.map_name))
+        # print('init.target: ', init.target)
+        t = init.target.flatten()
+        # print('t: ', t, '     t.shape: ', t.shape)
+        # print('where middle of 0 and 1: ', np.where(np.logical_and(t > 0.0, t < 1.0)))
         state.map[..., -1] = init.target
-        state.decomp_init = state.map[..., 3].copy()
+        state.decomp_init = state.map[..., 3].copy().astype(bool)
         state.decomp = []
         self.reset_state(state, init)
         state.cells_remaining = self.get_remaining_cells(state)
@@ -224,14 +246,14 @@ class CPPGym(GridGym):
         if not state.crashed and not state.landed:
             view = self.camera(state).compute_view(state.position)
             x, y = view.shape
-            state.map[:x, :y, 3] &= ~view
+            state.map[:x, :y, 3][view] = 0
             state.coverage[:x, :y] |= view
 
         if state.landed:
-            decomp = state.decomp_init & ~state.map[..., 3]
-            if np.any(decomp):
+            decomp = state.decomp_init & ~(state.map[..., 3].astype(bool))
+            if np.any(decomp>0):
                 state.decomp.append(decomp)
-                state.decomp_init = state.map[..., 3].copy()
+                state.decomp_init = state.map[..., 3].copy().astype(bool)
 
     def get_rewards(self, state):
         rewards = super().get_rewards(state)
@@ -274,6 +296,10 @@ class CPPGym(GridGym):
                 cell = state.map[x, y]
                 covered = state.coverage[x, y]
                 init_target = state.init.target[x, y]
+                '''
+                if init_target > 0:
+                    print('init_target: ', init_target)
+                '''
                 pos = np.array((x, y))
                 pos_image = pos * pix_size
                 dim_factor = 1.0 if covered else 0.6
