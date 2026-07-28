@@ -374,8 +374,10 @@ class PPOTrainer(BaseTrainer):
 
         offset = 250
         if self.params.debug_observations:
-            global_map = obs["global_map"][0].numpy()
-            local_map = obs["local_map"][0].numpy()
+            # global_map = obs["global_map"][0].numpy()
+            # local_map = obs["local_map"][0].numpy()
+            global_map = obs["global_map"][0]
+            local_map = obs["local_map"][0]
 
             obs_size = 100
             for k in range(global_map.shape[2]):

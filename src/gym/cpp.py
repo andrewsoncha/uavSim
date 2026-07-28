@@ -19,7 +19,7 @@ class RandomTargetGenerator:
 
     def generate_target(self, obstacles):
 
-        area = np.product(obstacles.shape)
+        area = np.prod(obstacles.shape)
 
         target = self.__generate_random_shapes_area(
             self.params.shape_range[0],
@@ -30,6 +30,22 @@ class RandomTargetGenerator:
         )
 
         return target & ~obstacles
+
+    def generate_patch_cover(self, obstacles_shape):
+
+        area = np.prod(obstacles_shape)
+        print('generate_patch_cover shape: ', obstacles_shape)
+        print('generate_patch_cover area: ', area)
+
+        cover = self.__generate_random_shapes_area(
+            self.params.shape_range[0],
+            self.params.shape_range[1],
+            area * 0.1,
+            area * 0.3,
+            obstacles_shape
+        )
+
+        return cover 
 
     def __generate_random_shapes(self, min_shapes, max_shapes, shape):
         img, _ = random_shapes(shape, max_shapes, min_shapes=min_shapes, channel_axis=None,
@@ -118,6 +134,7 @@ class CPPGym(GridGym):
     @dataclass
     class Init(GridGym.Init):
         target: np.ndarray
+        patch_cover: np.ndarray
 
     @dataclass
     class State(GridGym.State):
@@ -151,6 +168,10 @@ class CPPGym(GridGym):
 
     def initialize_map(self, state, map_index=None):
         self._initialize_map(state, map_index)
+        # state.patch_cover = np.zeros(state.map.shape[:2], dtype=bool)
+        print('state.map.shape: ', state.map.shape)
+        state.patch_cover = self.generator.generate_patch_cover(state.map.shape[:2])
+        print('state.patch_cover shape:', state.patch_cover.shape)
         target = np.zeros(state.map.shape[:2] + (1,), dtype=bool)
         print('target shape:', target.shape)
         state.map = np.concatenate((state.map, target), axis=-1)
@@ -190,14 +211,23 @@ class CPPGym(GridGym):
         return obs, self.get_info(state)
 
     def generate_init(self, map_name=None) -> Init:
+        print('generate_init called!')
         init = super().generate_init(map_name)
         map_index = self.get_map_index(init.map_name)
         shape = self._map_image[map_index].original_shape
         self.generator.shape = shape
         cropped_target = self.generator.generate_target(self._map_image[map_index].obst)
+        print('map obst shape: ', self._map_image[map_index].obst.shape)
+        patch_cover = self.generator.generate_patch_cover(self._map_image[map_index].obst.shape)
+        print('generate_init patch_cover.shape: ', patch_cover.shape)
+        patch_cover_int = np.array([patch_cover, patch_cover, patch_cover], dtype=np.uint8)*255
+        patch_cover_int = np.moveaxis(patch_cover_int, 0, -1)
+        print('generate_init : ', patch_cover_int)
+        print('generate_init min: ', np.min(patch_cover_int))
+        print('generate_init max: ', np.max(patch_cover_int))
         target = np.zeros(self.shape)
         target[:shape[0], :shape[1]] = cropped_target
-        return CPPGym.Init(position=init.position, budget=init.budget, map_name=init.map_name, target=target)
+        return CPPGym.Init(position=init.position, budget=init.budget, map_name=init.map_name, target=target, patch_cover=patch_cover)
 
     def step(self, action, state=None):
         if state is None:

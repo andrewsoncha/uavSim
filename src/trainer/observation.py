@@ -9,6 +9,8 @@ from utils import Factory
 import skimage.measure
 import random
 
+import cv2
+
 
 class ObservationFunction:
     @dataclass
@@ -89,6 +91,7 @@ class CenteredMapObservation(ObservationFunction):
         self.max_budget = max_budget
 
         self.centered_map = None
+        self.centered_cover = None
 
     def pad_centered(self, map_layers, position):
 
@@ -98,7 +101,7 @@ class CenteredMapObservation(ObservationFunction):
 
         if self.centered_map is None:
             m_c = m * 2 - 1
-            # print('m_c: ', m_c)
+            print('m_c: ', m_c)
             # print('np.reshape(self.params.padding_values, (1, 1, -1)), repeats=m_c, axis=0): ', np.reshape(self.params.padding_values, (1, 1, -1)).shape)
 
             self.centered_map = np.repeat(
@@ -109,8 +112,35 @@ class CenteredMapObservation(ObservationFunction):
         # print('centered_map: ', centered_map.shape)
         # print('map_layers: ', map_layers.shape)
         centered_map[x:x + m, y:y + m] = map_layers
+        print('pad_centered  centered_map shape: ', centered_map.shape)
 
         return centered_map
+
+    def pad_centered_patch(self, cover_layer, position):
+        print('pad_centered_patch called!')
+        print('cover_layer: ', cover_layer)
+        print('cover_layer max: ', np.max(cover_layer))
+        x, y = np.array(cover_layer.shape[:2]) - position - 1
+        m = cover_layer.shape[0]
+        # print('m: ', m)
+
+        if self.centered_cover is None:
+            m_c = m * 2 - 1
+            print('pad_centered_patch   m_c: ', m_c)
+            self.centered_cover = np.zeros((m_c, m_c), dtype=bool)
+            '''
+            self.centered_cover = np.repeat(
+                np.repeat(np.reshape(self.params.padding_values, (1, 1, -1)), repeats=m_c, axis=0), repeats=m_c,
+                axis=1).astype(float)
+            '''
+
+
+        centered_cover = self.centered_cover.copy()
+        centered_cover[x:x + m, y:y + m] = cover_layer
+
+        print('pad_centered_patch  centered_cover shape: ', centered_cover.shape)
+
+        return centered_cover
 
     def observe(self, state):
         map_layers = state.map
@@ -118,13 +148,16 @@ class CenteredMapObservation(ObservationFunction):
         if self.params.position_history:
             map_layers = np.concatenate((map_layers, np.expand_dims(state.position_history, -1)), axis=-1)
 
-        # print('state.position.shape: ', state.position.shape)
+        print('map_layers shape:', map_layers.shape)
         centered_map = np.expand_dims(self.pad_centered(map_layers, state.position), axis=0)
+        print('state.patch_cover shape:', state.patch_cover.shape)
+        print('observe patch_cover: ', state.patch_cover, '   min: ', np.min(state.patch_cover), '  max: ', np.max(state.patch_cover))
+        centered_patch_cover = self.pad_centered_patch(state.patch_cover, state.position)
         scalars = np.expand_dims(
             np.stack((state.budget / self.max_budget, state.landed), axis=-1), axis=0)
         mask = np.expand_dims(state.action_mask, axis=0)
 
-        return {"map": centered_map, "scalars": scalars, "mask": mask}
+        return {"map": centered_map, "scalars": scalars, "mask": mask, "patch_cover": centered_patch_cover}
 
     def observe_multi(self, states):
         map_layers = [state.map for state in states]
@@ -171,6 +204,38 @@ def flipMutate(global_map_arr, flip_prob: float):
                 map_arr[i, j, k, 3] = c
     return map_arr 
 
+# Written by Andrew Chang
+# Consistent patches of 1 or 0 in both target and other dimensions
+# patches are consistent in the global coordinates (if drone moves,
+# the patches are seen moved in the opposite direction in the global
+# view
+# If it's a range of real number this might need to change
+# Andrew Chang - July 25th, 2026.
+def patchMutate(obs):
+    map_arr = obs.pop('map').copy()
+    map_shape = map_arr.shape
+    map_target_int = np.array([map_arr[:,:,:, 3], map_arr[:,:,:, 3], map_arr[:,:,:, 3]], dtype=np.uint8)*255
+    map_target_int = np.moveaxis(map_target_int, 0, -1)
+    print('map_target_int shape: ', map_target_int.shape, '     min: ', np.min(map_target_int), '   max: ', np.max(map_target_int))
+
+    patch_cover = obs.pop('patch_cover').copy()
+    print('patch_cover: ', patch_cover)
+    patch_cover_int = np.array([patch_cover, patch_cover, patch_cover], dtype=np.uint8)*255
+    patch_cover_int = np.moveaxis(patch_cover_int, 0, -1)
+    print('patch_cover_int shape: ', patch_cover_int.shape, '     min: ', np.min(patch_cover_int), '   max: ', np.max(patch_cover_int))
+    cv2.imshow('patch_cover', patch_cover_int)
+    cv2.imshow('map', map_arr[0][:,:,0])
+    cv2.waitKey(100)
+    assert len(map_shape) > 0 
+    print('patch_cover.shape: ', patch_cover.shape[:2])
+    print('map_shape.shape: ', map_shape[1:][:2])
+    assert map_shape[1:][:2] == patch_cover.shape[:2]
+    for i in range(map_shape[-1]):
+        oneMap = map_arr[0, :, :, i]
+        print('oneMap shape: ', oneMap.shape)
+        map_arr[0, :, :, i] = oneMap * np.invert(patch_cover)
+    return map_arr
+
 class GlobLocObservation(CenteredMapObservation):
     @dataclass
     class Params(CenteredMapObservation.Params):
@@ -184,7 +249,7 @@ class GlobLocObservation(CenteredMapObservation):
     def observe(self, state):
         # print('state: ', state)
         obs = super().observe(state)
-        # print('obs: ', obs)
+        print('obs: ', obs.keys())
         # print('obs[map]: ', obs['map'])
         # print('obs[map].shape: ', obs['map'].shape)
         # print('obs[map] first dim: ', obs['map'].shape[0])
@@ -194,7 +259,14 @@ class GlobLocObservation(CenteredMapObservation):
 
     def _observe(self, obs):
         # print('_observe called!')
-        centered = obs.pop("map")
+        centered = patchMutate(obs)
+
+        print('centered shape: ', centered.shape)
+        cv2.imshow('covered_map[0]', centered[0, :, :, 0])
+        cv2.imshow('covered_map[1]', centered[0, :, :, 1])
+        cv2.imshow('covered_map[2]', centered[0, :, :, 2])
+        cv2.imshow('covered_map[3]', centered[0, :, :, 3])
+        cv2.waitKey(10)
         # print('centered.shape: ', centered.shape)
         # Put here for experimenting
         # print('centered: ', centered)
@@ -204,9 +276,7 @@ class GlobLocObservation(CenteredMapObservation):
         global_map = skimage.measure.block_reduce(centered, (1, g, g, 1), np.mean)
         
         # Add Probability flip
-        mutated_global_map = flipMutate(global_map, 0.05)
-
-        diff = mutated_global_map - global_map
+        # mutated_global_map = flipMutate(global_map, 0.05)
 
         # print("Changed Cells count: ", np.count_nonzero(diff))
 

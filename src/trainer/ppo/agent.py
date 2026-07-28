@@ -5,6 +5,7 @@ from src.trainer.model import ModelFactory
 
 import tensorflow as tf
 import keras
+import numpy as np
 
 import os
 
@@ -52,10 +53,25 @@ class ACAgent(Agent):
         self.actor.model = tf.keras.models.load_model(f"{path}/actor.keras")
         self.critic.model = tf.keras.models.load_model(f"{path}/critic.keras")
 
-    @tf.function
+    '''
+    # @tf.function
     def actor_inference(self, obs):
         print('self.expert_inference: ', self.expert_inference)
         return self.actor.predict_expert(obs) if self.expert_inference else self.actor(obs)
+    # Old code that causes trouble with newer tensorflow versions. Replaced with what's below
+    ''' 
+
+    # @tf.function
+    def actor_inference(self, obs):
+        # print("mask in actor_inference:", obs.get("mask"))
+        # print("obs keys:", obs.keys())
+        if self.expert_inference:
+            return self.actor.predict_expert(obs)
+        else:
+            mask = obs["mask"]
+            logits = self.actor(obs)
+            masked = tf.where(mask, logits, tf.fill(tf.shape(logits), -np.inf))
+            return tf.nn.softmax(masked, axis=-1)
 
     @tf.function
     def critic_inference(self, obs):

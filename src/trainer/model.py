@@ -17,19 +17,20 @@ class NNModel:
         self.observation_space = obs_space
         self.action_space = act_space
         self.model = self.create_model()
+        # plot_model(self.model, to_file="model.png")
 
-    @tf.function
+    # @tf.function
     def __call__(self, obs):
         return self.model(obs)
 
     def add_head(self, layer, mask):
+        # print('ADD HEAD MASK: ', mask)
+        # print('NNModel.add_head called! layer: ', layer, '    maks: ', mask)
         if self.action_space is None:
             # Value head
             outputs = Dense(1, activation=None)(layer)
         else:
-            layer = Dense(int(self.action_space.n), activation=None)(layer)
-            layer = ops.where(mask, layer, -np.inf)
-            outputs = Softmax(axis=-1)(layer)
+            outputs = Dense(int(self.action_space.n), activation=None)(layer)
         return outputs
 
     @property
@@ -119,14 +120,17 @@ class GlobLocModel(NNModel):
         conversion: str = "reduce"  # Supported "reduce" and "flatten"
 
     def __init__(self, params: Params, obs_space, act_space=None):
+        # print(f"INSTANTIATING {self.__class__.__name__}")
         super().__init__(params, obs_space, act_space)
 
     def create_model(self):
+        # print("BUILDING GLOB LOC MODEL")
         obs = self.observation_space
         global_map_input = Input(shape=obs["global_map"].shape[1:], dtype=tf.float32)
         local_map_input = Input(shape=obs["local_map"].shape[1:], dtype=tf.float32)
         scalars_input = Input(shape=obs["scalars"].shape[1:], dtype=tf.float32)
-        mask_input = Input(shape=obs["mask"].shape[1:], dtype=tf.bool)
+        # print('scalars_input.shape: ', scalars_input.shape)
+        # mask_input = Input(shape=obs["mask"].shape[1:], dtype=tf.bool)
 
         global_map = global_map_input
         local_map = local_map_input
@@ -158,16 +162,29 @@ class GlobLocModel(NNModel):
         else:
             raise NotImplementedError(f"Unknown conversion: {self.params.conversion}")
 
+        # print("global_features:", global_features.shape)
+        # print("local_features:", local_features.shape)
+        # print("scalars:", scalars_input.shape)
+
         layer = Concatenate(axis=1)([local_features, global_features, scalars_input])
 
         hidden_layer_num = self.params.hidden_layer_num
         for k in range(hidden_layer_num):
             layer = Dense(hidden_layer_size, activation="relu")(layer)
 
-        outputs = self.add_head(layer, mask_input)
+        outputs = self.add_head(layer, None)
+        # print('outputs: ', outputs)
 
-        return Model(inputs={"global_map": global_map_input, "local_map": local_map_input, "scalars": scalars_input,
-                             "mask": mask_input}, outputs=outputs)
+        return Model(inputs={"global_map": global_map_input, "local_map": local_map_input, "scalars": scalars_input},
+                outputs=outputs)
+
+    def __call__(self, obs):
+        # print('model summary: ', self.model.summary())
+        model_obs = {k: v for k, v in obs.items() if k != "mask"}
+        # print('model_obs: ',model_obs)
+
+        outputs = self.model(model_obs)
+        return outputs
 
 
 class RotEquivarianceModel(MapModel):

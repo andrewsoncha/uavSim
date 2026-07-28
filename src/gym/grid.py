@@ -76,6 +76,7 @@ class GridGym(gym.Env):
 
         map_index = 0
         map = None
+        patch_cover = None
         position_history = None
 
         action_mask = None
