@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Tuple
 
 import numpy as np
@@ -11,6 +11,7 @@ import random
 
 import cv2
 
+import traceback
 
 class ObservationFunction:
     @dataclass
@@ -112,33 +113,21 @@ class CenteredMapObservation(ObservationFunction):
         # print('centered_map: ', centered_map.shape)
         # print('map_layers: ', map_layers.shape)
         centered_map[x:x + m, y:y + m] = map_layers
-        print('pad_centered  centered_map shape: ', centered_map.shape)
+        # print('pad_centered  centered_map shape: ', centered_map.shape)
 
         return centered_map
 
     def pad_centered_patch(self, cover_layer, position):
-        print('pad_centered_patch called!')
-        print('cover_layer: ', cover_layer)
-        print('cover_layer max: ', np.max(cover_layer))
         x, y = np.array(cover_layer.shape[:2]) - position - 1
         m = cover_layer.shape[0]
         # print('m: ', m)
 
         if self.centered_cover is None:
             m_c = m * 2 - 1
-            print('pad_centered_patch   m_c: ', m_c)
             self.centered_cover = np.zeros((m_c, m_c), dtype=bool)
-            '''
-            self.centered_cover = np.repeat(
-                np.repeat(np.reshape(self.params.padding_values, (1, 1, -1)), repeats=m_c, axis=0), repeats=m_c,
-                axis=1).astype(float)
-            '''
-
 
         centered_cover = self.centered_cover.copy()
         centered_cover[x:x + m, y:y + m] = cover_layer
-
-        print('pad_centered_patch  centered_cover shape: ', centered_cover.shape)
 
         return centered_cover
 
@@ -148,30 +137,32 @@ class CenteredMapObservation(ObservationFunction):
         if self.params.position_history:
             map_layers = np.concatenate((map_layers, np.expand_dims(state.position_history, -1)), axis=-1)
 
-        print('map_layers shape:', map_layers.shape)
         centered_map = np.expand_dims(self.pad_centered(map_layers, state.position), axis=0)
-        print('state.patch_cover shape:', state.patch_cover.shape)
-        print('observe patch_cover: ', state.patch_cover, '   min: ', np.min(state.patch_cover), '  max: ', np.max(state.patch_cover))
-        centered_patch_cover = self.pad_centered_patch(state.patch_cover, state.position)
+        centered_patch_cover = np.expand_dims(self.pad_centered_patch(state.patch_cover, state.position), axis=0)
+                                            
         scalars = np.expand_dims(
             np.stack((state.budget / self.max_budget, state.landed), axis=-1), axis=0)
         mask = np.expand_dims(state.action_mask, axis=0)
 
-        return {"map": centered_map, "scalars": scalars, "mask": mask, "patch_cover": centered_patch_cover}
+        return {"map": centered_map, "scalars": scalars, "mask": mask, 'patch_cover': centered_patch_cover}
 
     def observe_multi(self, states):
         map_layers = [state.map for state in states]
+        patch_covers = [state.patch_cover for state in states]
 
         if self.params.position_history:
             position_histories = [state.position_history for state in states]
             map_layers = [np.concatenate((maps, np.expand_dims(position_history, -1)), axis=-1) for
                           maps, position_history in zip(map_layers, position_histories)]
 
-        centered_map = np.stack([self.pad_centered(maps, state.position) for maps, state in zip(map_layers, states)], 0)
+        centered_maps = np.stack([self.pad_centered(maps, state.position) for maps, state in zip(map_layers, states)], 0)
         scalars = np.stack([np.stack((state.budget / self.max_budget, state.landed), axis=-1) for state in states],
                            axis=0)
+
+        centered_patch_covers = np.stack([self.pad_centered_patch(state.patch_cover, state.position) for patch_cover, state in zip(patch_covers, states)], 0)
+
         mask = np.stack([state.action_mask for state in states], axis=0)
-        return {"map": centered_map, "scalars": scalars, "mask": mask}
+        return {"map": centered_maps, "scalars": scalars, "mask": mask, 'patch_cover': centered_patch_covers}
 
     def get_observation_space(self, state):
         obs = self.observe(state)
@@ -212,28 +203,20 @@ def flipMutate(global_map_arr, flip_prob: float):
 # If it's a range of real number this might need to change
 # Andrew Chang - July 25th, 2026.
 def patchMutate(obs):
-    map_arr = obs.pop('map').copy()
+    map_arr = obs['map'].copy()
     map_shape = map_arr.shape
     map_target_int = np.array([map_arr[:,:,:, 3], map_arr[:,:,:, 3], map_arr[:,:,:, 3]], dtype=np.uint8)*255
     map_target_int = np.moveaxis(map_target_int, 0, -1)
-    print('map_target_int shape: ', map_target_int.shape, '     min: ', np.min(map_target_int), '   max: ', np.max(map_target_int))
 
-    patch_cover = obs.pop('patch_cover').copy()
-    print('patch_cover: ', patch_cover)
+    patch_cover = obs['patch_cover'].copy()
     patch_cover_int = np.array([patch_cover, patch_cover, patch_cover], dtype=np.uint8)*255
     patch_cover_int = np.moveaxis(patch_cover_int, 0, -1)
-    print('patch_cover_int shape: ', patch_cover_int.shape, '     min: ', np.min(patch_cover_int), '   max: ', np.max(patch_cover_int))
-    cv2.imshow('patch_cover', patch_cover_int)
-    cv2.imshow('map', map_arr[0][:,:,0])
-    cv2.waitKey(100)
     assert len(map_shape) > 0 
-    print('patch_cover.shape: ', patch_cover.shape[:2])
-    print('map_shape.shape: ', map_shape[1:][:2])
-    assert map_shape[1:][:2] == patch_cover.shape[:2]
-    for i in range(map_shape[-1]):
-        oneMap = map_arr[0, :, :, i]
-        print('oneMap shape: ', oneMap.shape)
-        map_arr[0, :, :, i] = oneMap * np.invert(patch_cover)
+    assert map_shape[:3] == patch_cover.shape[:3]
+    for i in range(map_shape[0]): # Different Observation
+        for j in range(map_shape[3]): # each map corresponding to different parts of map (obstacles, targets, NFZs, etc.)
+            oneMap = map_arr[i, :, :, j]
+            map_arr[i, :, :, j] = oneMap * np.invert(patch_cover[i])
     return map_arr
 
 class GlobLocObservation(CenteredMapObservation):
@@ -247,43 +230,29 @@ class GlobLocObservation(CenteredMapObservation):
         self.params = params
 
     def observe(self, state):
-        # print('state: ', state)
         obs = super().observe(state)
-        print('obs: ', obs.keys())
-        # print('obs[map]: ', obs['map'])
-        # print('obs[map].shape: ', obs['map'].shape)
-        # print('obs[map] first dim: ', obs['map'].shape[0])
         obs = self._observe(obs)
 
         return obs
 
     def _observe(self, obs):
-        # print('_observe called!')
-        centered = patchMutate(obs)
+        centered = obs['map'].copy()
+        mutated = patchMutate(obs)
+        obs.pop('map')
+        obs.pop('patch_cover')
 
-        print('centered shape: ', centered.shape)
-        cv2.imshow('covered_map[0]', centered[0, :, :, 0])
-        cv2.imshow('covered_map[1]', centered[0, :, :, 1])
-        cv2.imshow('covered_map[2]', centered[0, :, :, 2])
-        cv2.imshow('covered_map[3]', centered[0, :, :, 3])
-        cv2.waitKey(10)
-        # print('centered.shape: ', centered.shape)
-        # Put here for experimenting
-        # print('centered: ', centered)
-        # end of experiment code
         g = self.params.global_map_scaling
         l = self.params.local_map_size
-        global_map = skimage.measure.block_reduce(centered, (1, g, g, 1), np.mean)
+        mutated_global_map = skimage.measure.block_reduce(mutated, (1, g, g, 1), np.mean)
         
         # Add Probability flip
         # mutated_global_map = flipMutate(global_map, 0.05)
 
+        # diff = global_map - mutated_global_map
         # print("Changed Cells count: ", np.count_nonzero(diff))
 
-        # print('global_map shape: ', global_map.shape)
         x, y = centered.shape[1:3]
         local_map = centered[:, x // 2 - l // 2: x // 2 + l // 2 + 1, x // 2 - l // 2: x // 2 + l // 2 + 1, :]
-        # print('global_map shape: ', global_map.shape)
         obs.update({"global_map": mutated_global_map, "local_map": local_map})
 
         return obs

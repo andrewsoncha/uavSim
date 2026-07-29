@@ -64,7 +64,6 @@ class ACAgent(Agent):
     # @tf.function
     def actor_inference(self, obs):
         # print("mask in actor_inference:", obs.get("mask"))
-        # print("obs keys:", obs.keys())
         if self.expert_inference:
             return self.actor.predict_expert(obs)
         else:
@@ -86,7 +85,6 @@ class ACAgent(Agent):
 
     @tf.function
     def get_action_prob_and_value(self, obs):
-        print('This is in ppo/agent.py get_action_prob_and_value!')
         action, probs = self.get_exploration_action(obs)
         value = self.get_value(obs)
         return action, probs, value
@@ -98,7 +96,6 @@ class ACAgent(Agent):
 
     @tf.function
     def get_exploration_action(self, obs, step=None):
-        print('This is in ppo/agent.py get_exploration_action')
         probs = self.actor_inference(obs)
         actions = tf.random.categorical(tf.math.log(probs), 1)
         p = tf.gather_nd(probs, actions, batch_dims=1)

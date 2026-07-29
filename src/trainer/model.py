@@ -124,8 +124,9 @@ class GlobLocModel(NNModel):
         super().__init__(params, obs_space, act_space)
 
     def create_model(self):
-        # print("BUILDING GLOB LOC MODEL")
+        print("BUILDING GLOB LOC MODEL")
         obs = self.observation_space
+        print('create_model obs: ', obs)
         global_map_input = Input(shape=obs["global_map"].shape[1:], dtype=tf.float32)
         local_map_input = Input(shape=obs["local_map"].shape[1:], dtype=tf.float32)
         scalars_input = Input(shape=obs["scalars"].shape[1:], dtype=tf.float32)
@@ -181,7 +182,6 @@ class GlobLocModel(NNModel):
     def __call__(self, obs):
         # print('model summary: ', self.model.summary())
         model_obs = {k: v for k, v in obs.items() if k != "mask"}
-        # print('model_obs: ',model_obs)
 
         outputs = self.model(model_obs)
         return outputs
