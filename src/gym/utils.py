@@ -9,6 +9,9 @@ import pygame
 from scipy.ndimage import convolve
 from skimage import io
 
+import cv2
+
+TARGET_COLOR = (0, 255, 0, 255)
 
 class Map:
     def __init__(self, map_data, name, map_path=None):
@@ -64,9 +67,22 @@ class Map:
         if type(path) is not str:
             raise TypeError('path needs to be a string')
         data = io.imread(path, as_gray=False)
-        data = data.astype(bool).transpose((1, 0, 2))[..., :3]
+        data_transposed = data.transpose((1, 0, 2))
+        data_bool = data_transposed.astype(bool)
+
+        print('load_map map_data')
+
+        map_data = data_bool[..., :3]
+        print('map_data: ', map_data.shape)
+        target_zone = cv2.inRange(data_transposed, TARGET_COLOR, TARGET_COLOR)
+        target_zone = target_zone.astype(bool)
+
+        print('target_zone set!')
+
         name = os.path.splitext(os.path.split(path)[1])[0]
-        return Map(data, name, map_path=path)
+        m = Map(map_data, name, map_path=path)
+        m.target_zone = target_zone if np.any(target_zone) else None
+        return m
 
     def load_or_create_model(self, map_path):
         filename = os.path.splitext(map_path)[0] + ".pickle"
@@ -118,7 +134,8 @@ class Map:
 
     @property
     def obst(self):
-        return self.map_data[:self.original_shape[0], :self.original_shape[1], 1]
+        obst = self.map_data[:self.original_shape[0], :self.original_shape[1], 0] & self.map_data[:self.original_shape[0], :self.original_shape[1], 1]
+        return obst
 
     @property
     def nfz(self):
