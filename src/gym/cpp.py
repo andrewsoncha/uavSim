@@ -46,8 +46,12 @@ class RandomTargetGenerator:
         return cover 
 
     def __generate_random_shapes(self, min_shapes, max_shapes, shape):
+        '''
         img, _ = random_shapes(shape, max_shapes, min_shapes=min_shapes, channel_axis=None,
                                allow_overlap=True, rng=np.random.randint(2 ** 32 - 1))
+        '''
+        img, _ = random_shapes(shape, max_shapes, min_shapes=min_shapes, channel_axis=None,
+                                       allow_overlap=True, rng=np.random.randint(2 ** 32 - 1))
         # Numpy random usage for random seed unifies random seed which can be set for repeatability
         attempt = np.array(img != 255, dtype=bool)
         return attempt, np.sum(attempt)
@@ -206,7 +210,15 @@ class CPPGym(GridGym):
         map_index = self.get_map_index(init.map_name)
         shape = self._map_image[map_index].original_shape
         self.generator.shape = shape
-        cropped_target = self.generator.generate_target(self._map_image[map_index].obst)
+        
+        # Change this part to make the target zones auto-generated! - Andrew Chang Aug 18th, 2026.
+        # cropped_target = self.generator.generate_target(self._map_image[map_index].obst)
+        map_img = self._map_image[map_index]
+        if hasattr(map_img, 'target_zone') and map_img.target_zone is not None:
+            cropped_target = map_img.target_zone
+        else:
+            cropped_target = self.generator.generate_target(map_img.obst)
+
         patch_cover = self.generator.generate_patch_cover(self._map_image[map_index].obst.shape)
         patch_cover_int = np.array([patch_cover, patch_cover, patch_cover], dtype=np.uint8)*255
         patch_cover_int = np.moveaxis(patch_cover_int, 0, -1)
