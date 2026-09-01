@@ -123,6 +123,7 @@ class Map:
     def shadowing(self):
         if "shadowing" in self.model:
             return self.model["shadowing"]
+        print('self.map_path: ', self.map_path)
         self.model["shadowing"] = calculate_shadowing(self.obst)
         if self.map_path is not None:
             self.save_model(self.map_path)
@@ -218,6 +219,8 @@ def calculate_shadowing(obst):
     size = obst.shape[0]
 
     total_shadow_map = np.ones((size, size, size, size), dtype=bool)
+    # Commented out to increase speed when running maps with no obstacles. Aug 31st, 2026 Andrew Chang
+    '''
     for i, j in np.ndindex(obst.shape):
         if obst[i, j]:
             continue
@@ -231,8 +234,8 @@ def calculate_shadowing(obst):
 
         total_shadow_map[i, j] = shadow_map
 
+    '''
     return total_shadow_map
-
 
 def load_image(path):
     if type(path) is not str:
@@ -416,6 +419,8 @@ def draw_shape_matrix(mat, canvas_shape, pix_size, fill=None, stroke=None, strok
 
 
 def is_solvable(landing_map, obstacles, visibility_map, max_budget):
+    # Commented out for running real life Maps. Aug 31st, 2026 Andrew Chang.
+    '''
     max_steps = max_budget // 2 - 1
 
     n, m = landing_map.shape
@@ -437,6 +442,7 @@ def is_solvable(landing_map, obstacles, visibility_map, max_budget):
         if not np.any(np.logical_and(reach, vm[x, y])):
             return False
 
+    '''
     return True
 
 
