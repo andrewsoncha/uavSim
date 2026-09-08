@@ -101,6 +101,7 @@ class SimpleSquareCamera:
 
     def compute_view(self, position):
         x_pos, y_pos = position
+        # print('self.visibility_map: ', self.visibility_map)
         return self.visibility_map[x_pos, y_pos]
 
 
@@ -224,7 +225,11 @@ class CPPGym(GridGym):
         patch_cover_int = np.moveaxis(patch_cover_int, 0, -1)
         target = np.zeros(self.shape)
         target[:shape[0], :shape[1]] = cropped_target
-        return CPPGym.Init(position=init.position, budget=init.budget, map_name=init.map_name, target=target, patch_cover=patch_cover)
+        
+        # Budget changed to 
+        budget = shape[0]*shape[1]//2
+        return CPPGym.Init(position=init.position, budget=budget, map_name=init.map_name, target=target, patch_cover=patch_cover)
+        # return CPPGym.Init(position=init.position, budget=init.budget, map_name=init.map_name, target=target, patch_cover=patch_cover)
 
     def step(self, action, state=None):
         if state is None:

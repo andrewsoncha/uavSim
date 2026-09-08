@@ -70,14 +70,14 @@ class Map:
         data_transposed = data.transpose((1, 0, 2))
         data_bool = data_transposed.astype(bool)
 
-        print('load_map map_data')
+        # print('load_map map_data')
 
         map_data = data_bool[..., :3]
-        print('map_data: ', map_data.shape)
+        # print('map_data: ', map_data.shape)
         target_zone = cv2.inRange(data_transposed, TARGET_COLOR, TARGET_COLOR)
         target_zone = target_zone.astype(bool)
 
-        print('target_zone set!')
+        # print('target_zone set!')
 
         name = os.path.splitext(os.path.split(path)[1])[0]
         m = Map(map_data, name, map_path=path)
@@ -318,7 +318,8 @@ def get_arrow_polygon(origin, destination, head_width=8, head_length=8, shaft_wi
 
 
 def get_visibility_map(half_length, shadowing_map):
-    sm = np.logical_not(shadowing_map)
+    # sm = np.logical_not(shadowing_map)
+    sm = np.ones_like(shadowing_map)
     n, m = sm.shape[:2]
     for i in range(n):
         if i - half_length > 0:

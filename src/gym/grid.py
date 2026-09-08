@@ -216,8 +216,9 @@ class GridGym(gym.Env):
         elif action == 6:
             if self.params.recharge and state.landed:
                 # Already landed and charging
-                state.budget += self.params.charge_amount + 1  # +1 for movement subtraction
-                state.budget = min(state.budget, self.params.budget_range[1] + 1)  # Constrain to max battery
+                # Commented out to disable charging, Andrew Chang Sep 8th, 2026
+                # state.budget += self.params.charge_amount + 1  # +1 for movement subtraction
+                # state.budget = min(state.budget, self.params.budget_range[1] + 1)  # Constrain to max battery
                 state.charging_steps += 1
             else:
                 state.infeasible = True
